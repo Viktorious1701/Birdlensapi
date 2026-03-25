@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: birdlensAPI
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/birdlens}
+    username: ${DB_USERNAME:birdlens}
+    password: ${DB_PASSWORD:secret}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none # Schema will be managed by Flyway in later epics
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
