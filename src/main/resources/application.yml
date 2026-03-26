@@ -11,15 +11,18 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: validate # Switched to validate to let Flyway handle schema creation safely
+      ddl-auto: validate
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        default_schema: public
     show-sql: true
   flyway:
     enabled: true
-    baseline-on-migrate: true
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+    schemas: public
+    default-schema: public
 
 management:
   endpoints:
