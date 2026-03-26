@@ -1,5 +1,6 @@
 package com.example.birdlensapi.integration;
 
+import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -9,6 +10,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureWebTestClient
 @ActiveProfiles("test")
 @Testcontainers
 public abstract class AbstractIntegrationTest {
@@ -27,8 +29,6 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.flyway.url", postgres::getJdbcUrl);
         registry.add("spring.flyway.user", postgres::getUsername);
         registry.add("spring.flyway.password", postgres::getPassword);
-
-        // Mock Redis and RabbitMQ for now so application context loads without them
         registry.add("spring.data.redis.host", () -> "localhost");
         registry.add("spring.rabbitmq.host", () -> "localhost");
     }
