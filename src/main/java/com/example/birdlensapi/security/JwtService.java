@@ -1,40 +1,62 @@
 package com.example.birdlensapi.security;
 
+import com.example.birdlensapi.domain.user.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.List;
 import java.util.function.Function;
 
 @Service
 public class JwtService {
 
-    @Value("${jwt.secret}")
+    @Value("${app.jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiry-minutes}")
+    @Value("${app.jwt.expiry-minutes}")
     private long expiryMinutes;
 
-    @Value("${jwt.refresh-expiry-days}")
+    @Value("${app.jwt.refresh-expiry-days}")
     private long refreshExpiryDays;
 
     // ── Token generation ──────────────────────────────────────────────────────
 
+    // Access token includes userId and roles claims (AC #4)
     public String generateAccessToken(UserDetails userDetails) {
-        return buildToken(userDetails, expiryMinutes * 60 * 1000L);
+        long expiryMillis = expiryMinutes * 60 * 1000L;
+        long now = System.currentTimeMillis();
+
+        var builder = Jwts.builder()
+                .subject(userDetails.getUsername())
+                .issuedAt(new Date(now))
+                .expiration(new Date(now + expiryMillis));
+
+        // Attach userId and roles when the principal is our User entity
+        if (userDetails instanceof User user) {
+            builder.claim("userId", user.getId().toString());
+            List<String> roles = user.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .toList();
+            builder.claim("roles", roles);
+        }
+
+        return builder.signWith(getSigningKey()).compact();
     }
 
+    // Refresh token is intentionally minimal — subject only, longer expiry
     public String generateRefreshToken(UserDetails userDetails) {
-        return buildToken(userDetails, refreshExpiryDays * 24 * 60 * 60 * 1000L);
+        return buildMinimalToken(userDetails, refreshExpiryDays * 24 * 60 * 60 * 1000L);
     }
 
-    private String buildToken(UserDetails userDetails, long expiryMillis) {
+    private String buildMinimalToken(UserDetails userDetails, long expiryMillis) {
         long now = System.currentTimeMillis();
         return Jwts.builder()
                 .subject(userDetails.getUsername())
@@ -63,6 +85,15 @@ public class JwtService {
 
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
+    }
+
+    public String extractUserId(String token) {
+        return extractClaim(token, claims -> claims.get("userId", String.class));
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<String> extractRoles(String token) {
+        return extractClaim(token, claims -> claims.get("roles", List.class));
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
