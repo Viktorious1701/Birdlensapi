@@ -1,4 +1,9 @@
 package com.example.birdlensapi.domain.auth;
 
-public class AuthResponse {
-}
+import com.example.birdlensapi.domain.user.UserResponse;
+
+public record AuthResponse(
+        String accessToken,
+        String refreshToken,
+        UserResponse user
+) {}

@@ -24,6 +24,13 @@ spring:
     schemas: public
     default-schema: public
 
+# Custom properties for the application
+app:
+  jwt:
+    secret: ${JWT_SECRET:your_super_secret_key_minimum_256_bits_length_for_local_dev}
+    expiry-minutes: ${JWT_EXPIRY_MINUTES:15}
+    refresh-expiry-days: ${JWT_REFRESH_EXPIRY_DAYS:7}
+
 management:
   endpoints:
     web:
