@@ -1,4 +1,4 @@
 package com.example.birdlensapi.domain.user;
 
-public class UserResponse {
+public class UserDetailsServiceImpl {
 }
