@@ -10,6 +10,8 @@ public record UserResponse(
         String firstName,
         String lastName,
         String avatarUrl,
+        UUID subscriptionId,
+        Instant subscriptionExpiresAt,
         Instant createdAt
 ) {
     public static UserResponse fromEntity(User user) {
@@ -20,6 +22,8 @@ public record UserResponse(
                 user.getFirstName(),
                 user.getLastName(),
                 user.getAvatarUrl(),
+                user.getSubscriptionId(),
+                user.getSubscriptionExpiresAt(),
                 user.getCreatedAt()
         );
     }

@@ -4,12 +4,15 @@ server:
 spring:
   application:
     name: birdlensAPI
+  main:
+    web-application-type: servlet # Explicitly set to servlet
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/birdlens}
     username: ${DB_USERNAME:birdlens}
     password: ${DB_PASSWORD:secret}
     driver-class-name: org.postgresql.Driver
   jpa:
+    open-in-view: false # Added from properties file
     hibernate:
       ddl-auto: validate
     properties:
