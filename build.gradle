@@ -31,11 +31,21 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-webflux' // For WebClient
 
+    // Hibernate Spatial for PostGIS Geometry/Geography mapping
+    implementation 'org.hibernate.orm:hibernate-spatial'
+
     // Flyway - correct for Spring Boot 3.x
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql'
 
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0' // Compatible version
+
+    // Resilience4j for eBird WebClient retries
+    implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
+    implementation 'io.github.resilience4j:resilience4j-reactor:2.2.0'
+
+    // Spring AOP is required for Resilience4j annotations (@Retry) to intercept method calls
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
 
     // JWT Authentication
     implementation 'io.jsonwebtoken:jjwt-api:0.12.5'
@@ -48,6 +58,8 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
+    testImplementation 'io.projectreactor:reactor-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 

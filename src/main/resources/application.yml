@@ -33,6 +33,19 @@ app:
     secret: ${JWT_SECRET:your_super_secret_key_minimum_256_bits_length_for_local_dev}
     expiry-minutes: ${JWT_EXPIRY_MINUTES:15}
     refresh-expiry-days: ${JWT_REFRESH_EXPIRY_DAYS:7}
+  ebird:
+    api-key: ${EBIRD_API_KEY:default_ebird_key_for_dev}
+    base-url: https://api.ebird.org/v2/
+
+resilience4j:
+  retry:
+    instances:
+      ebirdClient:
+        max-attempts: 3
+        wait-duration: 2s
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - org.springframework.web.reactive.function.client.WebClientResponseException.ServiceUnavailable
 
 management:
   endpoints:
