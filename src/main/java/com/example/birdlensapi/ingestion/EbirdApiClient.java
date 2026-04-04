@@ -24,4 +24,14 @@ public class EbirdApiClient {
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<List<TaxonomyDto>>() {});
     }
+
+    @Retry(name = "ebirdClient")
+    public Mono<List<EbirdObservationDto>> fetchRecentNotableObservations(String regionCode) {
+        return ebirdWebClient.get()
+                .uri(builder -> builder.path("data/obs/{regionCode}/recent/notable")
+                        .queryParam("detail", "simple")
+                        .build(regionCode))
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<List<EbirdObservationDto>>() {});
+    }
 }

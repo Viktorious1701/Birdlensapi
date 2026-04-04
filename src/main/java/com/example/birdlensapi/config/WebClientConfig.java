@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 
@@ -34,9 +35,15 @@ public class WebClientConfig {
                         .addHandlerLast(new ReadTimeoutHandler(10, TimeUnit.SECONDS))
                         .addHandlerLast(new WriteTimeoutHandler(10, TimeUnit.SECONDS)));
 
+        // Increase the memory buffer limit to 16MB to handle the massive 17,000+ record taxonomy JSON from eBird
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
+                .build();
+
         return builder
                 .baseUrl(ebirdBaseUrl)
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .exchangeStrategies(strategies)
                 .filter(ebirdAuthFilter())
                 .build();
     }

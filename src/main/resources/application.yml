@@ -36,6 +36,7 @@ app:
   ebird:
     api-key: ${EBIRD_API_KEY:default_ebird_key_for_dev}
     base-url: https://api.ebird.org/v2/
+    supported-regions: US,VN,GB
 
 resilience4j:
   retry:
