@@ -3,6 +3,8 @@ package com.example.birdlensapi.ingestion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,6 +33,16 @@ public class HotspotIngestionJob {
         this.ebirdApiClient = ebirdApiClient;
         this.jdbcTemplate = jdbcTemplate;
         this.supportedRegions = supportedRegions;
+    }
+
+    // Triggers automatically when the application is fully started
+    @EventListener(ApplicationReadyEvent.class)
+    public void onApplicationReady() {
+        Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ebird_hotspots", Integer.class);
+        if (count != null && count == 0) {
+            log.info("Hotspots table is empty. Triggering initial ingestion...");
+            scheduledIngestion();
+        }
     }
 
     // Runs every 6 hours

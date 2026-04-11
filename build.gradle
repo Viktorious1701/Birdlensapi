@@ -47,6 +47,9 @@ dependencies {
     // Spring AOP is required for Resilience4j annotations (@Retry) to intercept method calls
     implementation 'org.springframework.boot:spring-boot-starter-aop'
 
+    // Dotenv for loading .env files securely into Spring Environment
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
     // JWT Authentication
     implementation 'io.jsonwebtoken:jjwt-api:0.12.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.5'
