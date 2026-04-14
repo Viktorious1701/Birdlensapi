@@ -31,6 +31,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-webflux' // For WebClient
 
+    // Redis and Caching
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+
     // Hibernate Spatial for PostGIS Geometry/Geography mapping
     implementation 'org.hibernate.orm:hibernate-spatial'
 

@@ -5,8 +5,11 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,5 +35,22 @@ public class HotspotController {
 
         List<EbirdNearbyHotspot> hotspots = hotspotService.getNearbyHotspots(lat, lng, radiusKm);
         return ResponseEntity.ok(ApiResponse.success(hotspots));
+    }
+
+    @GetMapping("/{locId}")
+    public ResponseEntity<ApiResponse<EbirdNearbyHotspot>> getHotspotDetails(
+            @PathVariable("locId") String locId) {
+
+        EbirdNearbyHotspot hotspot = hotspotService.getHotspotDetails(locId);
+        return ResponseEntity.ok(ApiResponse.success(hotspot));
+    }
+
+    @GetMapping("/{locId}/visiting-times")
+    public ResponseEntity<ApiResponse<VisitingTimesAnalysis>> getVisitingTimes(
+            @PathVariable("locId") String locId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        VisitingTimesAnalysis analysis = hotspotService.getVisitingTimes(locId, userDetails.getUsername());
+        return ResponseEntity.ok(ApiResponse.success(analysis));
     }
 }
