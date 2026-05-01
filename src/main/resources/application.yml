@@ -34,10 +34,15 @@ app:
     expiry-minutes: ${JWT_EXPIRY_MINUTES:15}
     refresh-expiry-days: ${JWT_REFRESH_EXPIRY_DAYS:7}
   ebird:
-    # Safely pulling from the .env file now!
     api-key: ${EBIRD_API_KEY}
     base-url: https://api.ebird.org/v2/
     supported-regions: US,VN,GB
+  s3:
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    bucket: ${S3_BUCKET:birdlens-media}
+    access-key: ${S3_ACCESS_KEY:minioadmin}
+    secret-key: ${S3_SECRET_KEY:minioadmin}
+    region: ${S3_REGION:us-east-1}
 
 resilience4j:
   retry:
