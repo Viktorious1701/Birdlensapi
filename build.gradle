@@ -32,6 +32,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-webflux' // For WebClient
 
+    // RabbitMQ / Spring AMQP
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
     // Redis and Caching
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
@@ -43,21 +46,19 @@ dependencies {
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql'
 
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0' // Compatible version
+    // OpenAPI/Swagger
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
 
-    // Resilience4j for eBird WebClient retries
+    // Resilience4j for retries
     implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
     implementation 'io.github.resilience4j:resilience4j-reactor:2.2.0'
-
-    // Spring AOP is required for Resilience4j annotations (@Retry) to intercept method calls
     implementation 'org.springframework.boot:spring-boot-starter-aop'
 
-    // Dotenv for loading .env files securely into Spring Environment
+    // Dotenv for loading .env files securely
     implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 
     // AWS SDK v2 for S3 and Presigned URLs (MinIO compatible)
     implementation 'software.amazon.awssdk:s3'
-    implementation 'software.amazon.awssdk:s3-presigner'
 
     // JWT Authentication
     implementation 'io.jsonwebtoken:jjwt-api:0.12.5'
@@ -71,6 +72,7 @@ dependencies {
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation 'org.testcontainers:minio'
+    testImplementation 'org.testcontainers:rabbitmq'
     testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
     testImplementation 'io.projectreactor:reactor-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
