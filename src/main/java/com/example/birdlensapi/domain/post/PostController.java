@@ -2,16 +2,21 @@ package com.example.birdlensapi.domain.post;
 
 import com.example.birdlensapi.common.dto.ApiResponse;
 import com.example.birdlensapi.domain.post.dto.CreatePostRequest;
+import com.example.birdlensapi.domain.post.dto.FeedPageResponse;
 import com.example.birdlensapi.domain.post.dto.PostResponse;
 import com.example.birdlensapi.domain.post.dto.PresignedUrlRequest;
 import com.example.birdlensapi.domain.post.dto.PresignedUrlResponse;
 import com.example.birdlensapi.domain.user.User;
 import com.example.birdlensapi.storage.S3StorageService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,6 +34,14 @@ public class PostController {
     public PostController(S3StorageService s3StorageService, PostService postService) {
         this.s3StorageService = s3StorageService;
         this.postService = postService;
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<FeedPageResponse>> getFeed(
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        FeedPageResponse response = postService.getFeed(pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PostMapping("/media/request-upload")

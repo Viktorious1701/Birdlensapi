@@ -3,6 +3,8 @@ package com.example.birdlensapi.domain.post;
 import com.example.birdlensapi.common.exception.ResourceNotFoundException;
 import com.example.birdlensapi.config.RabbitMQConfig;
 import com.example.birdlensapi.domain.post.dto.CreatePostRequest;
+import com.example.birdlensapi.domain.post.dto.FeedPageResponse;
+import com.example.birdlensapi.domain.post.dto.PostFeedResponse;
 import com.example.birdlensapi.domain.post.dto.PostResponse;
 import com.example.birdlensapi.domain.taxonomy.BirdTaxonomy;
 import com.example.birdlensapi.domain.taxonomy.TaxonomyRepository;
@@ -14,8 +16,14 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class PostService {
@@ -50,37 +58,52 @@ public class PostService {
         post.setType(request.type());
         post.setSightingDate(request.sightingDate());
 
-        // Map spatial coordinates if provided
         if (request.lat() != null && request.lng() != null) {
             Point point = geometryFactory.createPoint(new Coordinate(request.lng(), request.lat()));
             post.setLocationPoint(point);
         }
 
-        // Map taxonomy species if provided
         if (request.taggedSpeciesCode() != null && !request.taggedSpeciesCode().isBlank()) {
             BirdTaxonomy species = taxonomyRepository.findById(request.taggedSpeciesCode())
                     .orElseThrow(() -> new ResourceNotFoundException("Species code not found: " + request.taggedSpeciesCode()));
             post.setTaggedSpecies(species);
         }
 
-        // Attach media records (they start as PENDING processing status)
         if (request.mediaKeys() != null) {
             for (String key : request.mediaKeys()) {
                 PostMedia media = new PostMedia();
                 media.setOriginalUrl(key);
                 media.setProcessingStatus(ProcessingStatus.PENDING);
-                post.addMedia(media); // This handles the bidirectional mapping cleanly
+                post.addMedia(media);
             }
         }
 
         Post savedPost = postRepository.save(post);
 
-        // Publish the event to RabbitMQ for asynchronous image processing
         if (request.mediaKeys() != null && !request.mediaKeys().isEmpty()) {
             PostCreatedEvent event = new PostCreatedEvent(savedPost.getId());
             rabbitTemplate.convertAndSend(RabbitMQConfig.POSTS_EXCHANGE, RabbitMQConfig.POST_CREATED_ROUTING_KEY, event);
         }
 
         return PostResponse.fromEntity(savedPost);
+    }
+
+    @Cacheable(value = "feed", key = "#pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()")
+    @Transactional(readOnly = true)
+    public FeedPageResponse getFeed(Pageable pageable) {
+        Page<Post> postPage = postRepository.findFeedPosts(pageable, ProcessingStatus.COMPLETED);
+
+        List<PostFeedResponse> content = postPage.getContent().stream()
+                .map(PostFeedResponse::fromEntity)
+                .collect(Collectors.toList());
+
+        return new FeedPageResponse(
+                content,
+                postPage.getNumber(),
+                postPage.getSize(),
+                postPage.getTotalElements(),
+                postPage.getTotalPages(),
+                postPage.isLast()
+        );
     }
 }
