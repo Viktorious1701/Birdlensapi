@@ -16,6 +16,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.locationtech.jts.geom.Point;
 
@@ -64,6 +65,13 @@ public class Post {
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PostMedia> media = new ArrayList<>();
 
+    // Hibernate will automatically execute these subqueries efficiently when fetching a Post
+    @Formula("(SELECT count(*) FROM post_reactions r WHERE r.post_id = id AND r.reaction_type = 'LIKE')")
+    private Integer likeCount = 0;
+
+    @Formula("(SELECT count(*) FROM post_comments c WHERE c.post_id = id)")
+    private Integer commentCount = 0;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -74,7 +82,6 @@ public class Post {
 
     public Post() {}
 
-    // Utility method to keep both sides of the bidirectional relationship in sync
     public void addMedia(PostMedia postMedia) {
         media.add(postMedia);
         postMedia.setPost(this);
@@ -114,6 +121,9 @@ public class Post {
 
     public List<PostMedia> getMedia() { return media; }
     public void setMedia(List<PostMedia> media) { this.media = media; }
+
+    public Integer getLikeCount() { return likeCount == null ? 0 : likeCount; }
+    public Integer getCommentCount() { return commentCount == null ? 0 : commentCount; }
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }

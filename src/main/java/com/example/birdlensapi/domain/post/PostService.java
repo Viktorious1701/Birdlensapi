@@ -2,6 +2,9 @@ package com.example.birdlensapi.domain.post;
 
 import com.example.birdlensapi.common.exception.ResourceNotFoundException;
 import com.example.birdlensapi.config.RabbitMQConfig;
+import com.example.birdlensapi.domain.post.dto.CommentPageResponse;
+import com.example.birdlensapi.domain.post.dto.CommentRequest;
+import com.example.birdlensapi.domain.post.dto.CommentResponse;
 import com.example.birdlensapi.domain.post.dto.CreatePostRequest;
 import com.example.birdlensapi.domain.post.dto.FeedPageResponse;
 import com.example.birdlensapi.domain.post.dto.PostFeedResponse;
@@ -23,22 +26,30 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 public class PostService {
 
     private final PostRepository postRepository;
+    private final PostReactionRepository postReactionRepository;
+    private final PostCommentRepository postCommentRepository;
     private final UserRepository userRepository;
     private final TaxonomyRepository taxonomyRepository;
     private final RabbitTemplate rabbitTemplate;
     private final GeometryFactory geometryFactory;
 
     public PostService(PostRepository postRepository,
+                       PostReactionRepository postReactionRepository,
+                       PostCommentRepository postCommentRepository,
                        UserRepository userRepository,
                        TaxonomyRepository taxonomyRepository,
                        RabbitTemplate rabbitTemplate) {
         this.postRepository = postRepository;
+        this.postReactionRepository = postReactionRepository;
+        this.postCommentRepository = postCommentRepository;
         this.userRepository = userRepository;
         this.taxonomyRepository = taxonomyRepository;
         this.rabbitTemplate = rabbitTemplate;
@@ -104,6 +115,70 @@ public class PostService {
                 postPage.getTotalElements(),
                 postPage.getTotalPages(),
                 postPage.isLast()
+        );
+    }
+
+    @Transactional
+    public void toggleLike(UUID postId, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
+
+        Optional<PostReaction> existingReaction = postReactionRepository
+                .findByPostIdAndUserIdAndReactionType(post.getId(), user.getId(), ReactionType.LIKE);
+
+        if (existingReaction.isPresent()) {
+            // User already liked it, so we delete it (Toggle Off)
+            postReactionRepository.delete(existingReaction.get());
+        } else {
+            // User hasn't liked it, so we create it (Toggle On)
+            PostReaction reaction = new PostReaction();
+            reaction.setPost(post);
+            reaction.setUser(user);
+            reaction.setReactionType(ReactionType.LIKE);
+            postReactionRepository.save(reaction);
+        }
+    }
+
+    @Transactional
+    public CommentResponse addComment(UUID postId, CommentRequest request, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
+
+        PostComment comment = new PostComment();
+        comment.setPost(post);
+        comment.setUser(user);
+        comment.setContent(request.content());
+
+        PostComment savedComment = postCommentRepository.save(comment);
+
+        return CommentResponse.fromEntity(savedComment);
+    }
+
+    @Transactional(readOnly = true)
+    public CommentPageResponse getComments(UUID postId, Pageable pageable) {
+        if (!postRepository.existsById(postId)) {
+            throw new ResourceNotFoundException("Post not found");
+        }
+
+        Page<PostComment> commentPage = postCommentRepository.findByPostId(postId, pageable);
+
+        List<CommentResponse> content = commentPage.getContent().stream()
+                .map(CommentResponse::fromEntity)
+                .collect(Collectors.toList());
+
+        return new CommentPageResponse(
+                content,
+                commentPage.getNumber(),
+                commentPage.getSize(),
+                commentPage.getTotalElements(),
+                commentPage.getTotalPages(),
+                commentPage.isLast()
         );
     }
 }

@@ -1,6 +1,9 @@
 package com.example.birdlensapi.domain.post;
 
 import com.example.birdlensapi.common.dto.ApiResponse;
+import com.example.birdlensapi.domain.post.dto.CommentPageResponse;
+import com.example.birdlensapi.domain.post.dto.CommentRequest;
+import com.example.birdlensapi.domain.post.dto.CommentResponse;
 import com.example.birdlensapi.domain.post.dto.CreatePostRequest;
 import com.example.birdlensapi.domain.post.dto.FeedPageResponse;
 import com.example.birdlensapi.domain.post.dto.PostResponse;
@@ -17,12 +20,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/posts")
@@ -62,5 +67,35 @@ public class PostController {
 
         PostResponse response = postService.createPost(request, userDetails.getUsername());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    // --- Social Interactions ---
+
+    @PostMapping("/{postId}/reactions")
+    public ResponseEntity<ApiResponse<Void>> toggleLike(
+            @PathVariable("postId") UUID postId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        postService.toggleLike(postId, userDetails.getUsername());
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/{postId}/comments")
+    public ResponseEntity<ApiResponse<CommentResponse>> addComment(
+            @PathVariable("postId") UUID postId,
+            @Valid @RequestBody CommentRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        CommentResponse response = postService.addComment(postId, request, userDetails.getUsername());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{postId}/comments")
+    public ResponseEntity<ApiResponse<CommentPageResponse>> getComments(
+            @PathVariable("postId") UUID postId,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
+
+        CommentPageResponse response = postService.getComments(postId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

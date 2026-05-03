@@ -24,6 +24,8 @@ public record PostFeedResponse(
         LocalDate sightingDate,
         String taggedSpeciesCode,
         List<PostMediaFeedResponse> media,
+        Integer likeCount,
+        Integer commentCount,
         Instant createdAt
 ) {
     public static PostFeedResponse fromEntity(Post post) {
@@ -36,7 +38,6 @@ public record PostFeedResponse(
 
         String speciesCode = post.getTaggedSpecies() != null ? post.getTaggedSpecies().getSpeciesCode() : null;
 
-        // Double check safeguard: only map media that has successfully completed processing
         List<PostMediaFeedResponse> mediaResponses = post.getMedia().stream()
                 .filter(m -> m.getProcessingStatus() == ProcessingStatus.COMPLETED)
                 .map(PostMediaFeedResponse::fromEntity)
@@ -54,6 +55,8 @@ public record PostFeedResponse(
                 post.getSightingDate(),
                 speciesCode,
                 mediaResponses,
+                post.getLikeCount(),
+                post.getCommentCount(),
                 post.getCreatedAt()
         );
     }
