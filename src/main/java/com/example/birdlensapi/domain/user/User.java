@@ -1,6 +1,15 @@
 package com.example.birdlensapi.domain.user;
 
-import jakarta.persistence.*;
+import com.example.birdlensapi.domain.subscription.Subscription;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.security.core.GrantedAuthority;
@@ -37,8 +46,9 @@ public class User implements UserDetails {
     @Column(name = "avatar_url", columnDefinition = "TEXT")
     private String avatarUrl;
 
-    @Column(name = "subscription_id")
-    private UUID subscriptionId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subscription_id")
+    private Subscription subscription;
 
     @Column(name = "subscription_expires_at")
     private Instant subscriptionExpiresAt;
@@ -51,8 +61,6 @@ public class User implements UserDetails {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    // ── Constructors ──────────────────────────────────────────────────────────
-
     public User() {}
 
     public User(String email, String username, String passwordHash) {
@@ -61,11 +69,9 @@ public class User implements UserDetails {
         this.passwordHash = passwordHash;
     }
 
-    // ── UserDetails ───────────────────────────────────────────────────────────
-
     @Override
     public String getUsername() {
-        return email; // Spring Security uses email as the unique identifier
+        return email;
     }
 
     @Override
@@ -75,7 +81,7 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(); // no roles yet
+        return List.of();
     }
 
     @Override public boolean isAccountNonExpired() { return true; }
@@ -83,21 +89,20 @@ public class User implements UserDetails {
     @Override public boolean isCredentialsNonExpired() { return true; }
     @Override public boolean isEnabled() { return true; }
 
-    // ── Getters ───────────────────────────────────────────────────────────────
-
     public UUID getId() { return id; }
     public String getEmail() { return email; }
-    public String getDisplayUsername() { return username; } // avoids clash with UserDetails.getUsername()
+    public String getDisplayUsername() { return username; }
     public String getPasswordHash() { return passwordHash; }
     public String getFirstName() { return firstName; }
     public String getLastName() { return lastName; }
     public String getAvatarUrl() { return avatarUrl; }
-    public UUID getSubscriptionId() { return subscriptionId; }
+
+    public Subscription getSubscription() { return subscription; }
+    public void setSubscription(Subscription subscription) { this.subscription = subscription; }
+
     public Instant getSubscriptionExpiresAt() { return subscriptionExpiresAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
-
-    // ── Setters ───────────────────────────────────────────────────────────────
 
     public void setEmail(String email) { this.email = email; }
     public void setUsername(String username) { this.username = username; }
@@ -105,6 +110,5 @@ public class User implements UserDetails {
     public void setFirstName(String firstName) { this.firstName = firstName; }
     public void setLastName(String lastName) { this.lastName = lastName; }
     public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
-    public void setSubscriptionId(UUID subscriptionId) { this.subscriptionId = subscriptionId; }
     public void setSubscriptionExpiresAt(Instant instant) { this.subscriptionExpiresAt = instant; }
 }

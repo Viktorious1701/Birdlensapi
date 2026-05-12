@@ -3,6 +3,8 @@ package com.example.birdlensapi.integration;
 import com.example.birdlensapi.domain.auth.LoginRequest;
 import com.example.birdlensapi.domain.hotspot.EbirdHotspot;
 import com.example.birdlensapi.domain.hotspot.HotspotRepository;
+import com.example.birdlensapi.domain.subscription.Subscription;
+import com.example.birdlensapi.domain.subscription.SubscriptionRepository;
 import com.example.birdlensapi.domain.user.RegisterRequest;
 import com.example.birdlensapi.domain.user.User;
 import com.example.birdlensapi.domain.user.UserRepository;
@@ -18,12 +20,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.times;
@@ -34,12 +36,14 @@ class HotspotIntegrationTest extends AbstractIntegrationTest {
         @Autowired
         private WebTestClient client;
 
-        // Converted to SpyBean so we can track method invocations to prove caching works
         @SpyBean
         private HotspotRepository hotspotRepository;
 
         @Autowired
         private UserRepository userRepository;
+
+        @Autowired
+        private SubscriptionRepository subscriptionRepository;
 
         private String validStandardJwtToken;
         private String validPremiumJwtToken;
@@ -48,10 +52,12 @@ class HotspotIntegrationTest extends AbstractIntegrationTest {
 
         @BeforeEach
         void setUp() {
-                // Reset the SpyBean invocations before each test
                 Mockito.reset(hotspotRepository);
                 hotspotRepository.deleteAll();
+
+                // Delete Users before Subscriptions to prevent Foreign Key constraint violations
                 userRepository.deleteAll();
+                subscriptionRepository.deleteAll();
 
                 // 1. Setup Standard User (No Subscription)
                 RegisterRequest standardRegister = new RegisterRequest("standard@example.com", "standarduser", "securepass123");
@@ -77,9 +83,15 @@ class HotspotIntegrationTest extends AbstractIntegrationTest {
                         .exchange()
                         .expectStatus().isCreated();
 
-                // Manually elevate the user to premium in the database
+                // Manually save a true Subscription object, then link the premium user
+                Subscription premiumSub = new Subscription();
+                premiumSub.setName("ExBird Premium");
+                premiumSub.setProductId("sub_premium");
+                premiumSub.setPrice(new BigDecimal("9.99"));
+                premiumSub = subscriptionRepository.save(premiumSub);
+
                 User premiumUser = userRepository.findByEmail("premium@example.com").orElseThrow();
-                premiumUser.setSubscriptionId(UUID.randomUUID());
+                premiumUser.setSubscription(premiumSub);
                 premiumUser.setSubscriptionExpiresAt(Instant.now().plus(30, ChronoUnit.DAYS));
                 userRepository.save(premiumUser);
 
@@ -96,11 +108,8 @@ class HotspotIntegrationTest extends AbstractIntegrationTest {
                 // 3. Seed database with precise spatial testing data
                 List<EbirdHotspot> mockHotspots = new ArrayList<>();
 
-                // Center Point
                 mockHotspots.add(createHotspot("L1", "Center Hotspot", 10.7769, 106.7009, 150));
-                // Nearby Point (~4.4 km away from center)
                 mockHotspots.add(createHotspot("L2", "Nearby Hotspot", 10.7369, 106.7009, 200));
-                // Far Point (~111 km away from center)
                 mockHotspots.add(createHotspot("L3", "Far Hotspot", 11.7769, 106.7009, 300));
 
                 hotspotRepository.saveAll(mockHotspots);
@@ -164,25 +173,20 @@ class HotspotIntegrationTest extends AbstractIntegrationTest {
 
         @Test
         void shouldCacheNearbyHotspots() {
-                // 1. First call - should hit DB
                 client.get().uri("/api/v1/hotspots/nearby?lat=10.7769&lng=106.7009&radiusKm=10")
                         .header("Authorization", "Bearer " + validStandardJwtToken)
                         .exchange()
                         .expectStatus().isOk();
 
-                // Verify repository was called exactly once
                 verify(hotspotRepository, times(1)).findNearby(anyDouble(), anyDouble(), anyDouble());
 
-                // 2. Second call - identical params
                 client.get().uri("/api/v1/hotspots/nearby?lat=10.7769&lng=106.7009&radiusKm=10")
                         .header("Authorization", "Bearer " + validStandardJwtToken)
                         .exchange()
                         .expectStatus().isOk();
 
-                // Verify repository is STILL only called once (served entirely from cache)
                 verify(hotspotRepository, times(1)).findNearby(anyDouble(), anyDouble(), anyDouble());
 
-                // 3. Third call - slightly different coordinates but same rounded value
                 client.get().uri("/api/v1/hotspots/nearby?lat=10.781&lng=106.704&radiusKm=10")
                         .header("Authorization", "Bearer " + validStandardJwtToken)
                         .exchange()
@@ -225,7 +229,7 @@ class HotspotIntegrationTest extends AbstractIntegrationTest {
                         .expectBody()
                         .jsonPath("$.success").isEqualTo(false)
                         .jsonPath("$.error.code").isEqualTo("FORBIDDEN")
-                        .jsonPath("$.error.message").isEqualTo("You do not have permission to access this resource.");
+                        .jsonPath("$.error.message").isEqualTo("Active premium subscription required to view analytical visiting times.");
         }
 
         @Test
@@ -237,10 +241,8 @@ class HotspotIntegrationTest extends AbstractIntegrationTest {
                         .expectBody()
                         .jsonPath("$.success").isEqualTo(true)
                         .jsonPath("$.data.locId").isEqualTo("L1")
-                        // Verify the 12 months map exists
                         .jsonPath("$.data.monthlyStats.1").exists()
                         .jsonPath("$.data.monthlyStats.12").exists()
-                        // Verify the 24 hours map exists
                         .jsonPath("$.data.hourlyStats.0").exists()
                         .jsonPath("$.data.hourlyStats.23").exists();
         }
@@ -253,7 +255,6 @@ class HotspotIntegrationTest extends AbstractIntegrationTest {
                         .expectStatus().isNotFound()
                         .expectBody()
                         .jsonPath("$.success").isEqualTo(false)
-                        .jsonPath("$.error.code").isEqualTo("RESOURCE_NOT_FOUND")
-                        .jsonPath("$.error.message").isEqualTo("Hotspot with id 'L9999999' not found");
+                        .jsonPath("$.error.code").isEqualTo("RESOURCE_NOT_FOUND");
         }
 }

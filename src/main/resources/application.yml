@@ -23,6 +23,8 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: false
+    # This allows us to apply V4 later even though V5 is already applied!
+    out-of-order: true
     locations: classpath:db/migration
     schemas: public
     default-schema: public

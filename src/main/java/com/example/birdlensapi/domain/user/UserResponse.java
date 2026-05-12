@@ -18,11 +18,12 @@ public record UserResponse(
         return new UserResponse(
                 user.getId(),
                 user.getEmail(),
-                user.getDisplayUsername(), // changed from getUsername()
+                user.getDisplayUsername(),
                 user.getFirstName(),
                 user.getLastName(),
                 user.getAvatarUrl(),
-                user.getSubscriptionId(),
+                // Safely extract the ID from the Subscription object if the user has one
+                user.getSubscription() != null ? user.getSubscription().getId() : null,
                 user.getSubscriptionExpiresAt(),
                 user.getCreatedAt()
         );
