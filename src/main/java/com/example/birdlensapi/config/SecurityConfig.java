@@ -29,8 +29,6 @@ public class SecurityConfig {
         this.userDetailsService = userDetailsService;
     }
 
-    // ── Beans ─────────────────────────────────────────────────────────────────
-
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12);
@@ -49,26 +47,23 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-    // ── Filter chain ──────────────────────────────────────────────────────────
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/health").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api/v1/webhooks/**").permitAll()
+                        .requestMatchers("/api/v1/webhooks/**").permitAll() // Webhooks are secured via HMAC signatures,
+                                                                            // not JWT
                         .requestMatchers("/swagger-ui/**").permitAll()
                         .requestMatchers("/swagger-ui.html").permitAll()
                         .requestMatchers("/v3/api-docs/**").permitAll()
-                        .anyRequest().authenticated()
-                );
+                        .anyRequest().authenticated());
 
         return http.build();
     }
