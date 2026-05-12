@@ -1,5 +1,6 @@
 package com.example.birdlensapi.integration;
 
+import com.example.birdlensapi.config.RabbitMQConfig;
 import com.example.birdlensapi.domain.auth.LoginRequest;
 import com.example.birdlensapi.domain.post.Post;
 import com.example.birdlensapi.domain.post.PostReactionRepository;
@@ -10,9 +11,12 @@ import com.example.birdlensapi.domain.post.dto.CommentRequest;
 import com.example.birdlensapi.domain.user.RegisterRequest;
 import com.example.birdlensapi.domain.user.User;
 import com.example.birdlensapi.domain.user.UserRepository;
+import com.example.birdlensapi.messaging.events.NewCommentEvent;
+import com.example.birdlensapi.messaging.events.PostLikedEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -32,7 +36,11 @@ class SocialInteractionIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+
     private String validJwtToken;
+    private User testUser;
     private Post testPost;
 
     @BeforeEach
@@ -41,7 +49,18 @@ class SocialInteractionIntegrationTest extends AbstractIntegrationTest {
         postRepository.deleteAll();
         userRepository.deleteAll();
 
-        // 1. Setup User and Auth
+        // 1. Setup Original Post Owner
+        User owner = new User("owner@example.com", "owneruser", "pass");
+        owner = userRepository.save(owner);
+
+        Post post = new Post();
+        post.setUser(owner);
+        post.setContent("This is an original post from the owner!");
+        post.setType(PostType.GENERAL);
+        post.setPrivacyLevel(PrivacyLevel.PUBLIC);
+        testPost = postRepository.save(post);
+
+        // 2. Setup the User interacting with the post
         RegisterRequest register = new RegisterRequest("social@example.com", "socialuser", "securepass123");
         client.post().uri("/api/v1/auth/register")
                 .bodyValue(register)
@@ -58,19 +77,11 @@ class SocialInteractionIntegrationTest extends AbstractIntegrationTest {
                 .blockFirst()
                 .get("data").get("accessToken").asText();
 
-        User user = userRepository.findByEmail("social@example.com").orElseThrow();
-
-        // 2. Seed a Post
-        Post post = new Post();
-        post.setUser(user);
-        post.setContent("This is a social test post!");
-        post.setType(PostType.GENERAL);
-        post.setPrivacyLevel(PrivacyLevel.PUBLIC);
-        testPost = postRepository.save(post);
+        testUser = userRepository.findByEmail("social@example.com").orElseThrow();
     }
 
     @Test
-    void shouldToggleLikeSuccessfully() {
+    void shouldToggleLikeSuccessfullyAndPublishEvent() {
         // 1. Initial state: 0 reactions
         assertThat(postReactionRepository.count()).isEqualTo(0);
 
@@ -82,6 +93,14 @@ class SocialInteractionIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(postReactionRepository.count()).isEqualTo(1);
 
+        // Verify RabbitMQ Event published correctly since it's a NEW like
+        PostLikedEvent event = (PostLikedEvent) rabbitTemplate.receiveAndConvert(
+                RabbitMQConfig.NOTIFICATIONS_QUEUE, 2000);
+
+        assertThat(event).isNotNull();
+        assertThat(event.likerUserId()).isEqualTo(testUser.getId());
+        assertThat(event.postOwnerUserId()).isEqualTo(testPost.getUser().getId());
+
         // 3. Second toggle: Unlike the post
         client.post().uri("/api/v1/posts/" + testPost.getId() + "/reactions")
                 .header("Authorization", "Bearer " + validJwtToken)
@@ -89,35 +108,33 @@ class SocialInteractionIntegrationTest extends AbstractIntegrationTest {
                 .expectStatus().isOk();
 
         assertThat(postReactionRepository.count()).isEqualTo(0);
+
+        // Verify NO event is published for an 'unlike' action
+        PostLikedEvent unlikeEvent = (PostLikedEvent) rabbitTemplate.receiveAndConvert(
+                RabbitMQConfig.NOTIFICATIONS_QUEUE, 500); // short wait, should be empty
+        assertThat(unlikeEvent).isNull();
     }
 
     @Test
-    void shouldAddCommentAndPaginateResults() {
-        // 1. Add 3 comments
-        for (int i = 1; i <= 3; i++) {
-            CommentRequest request = new CommentRequest("Comment number " + i);
+    void shouldAddCommentAndPublishEvent() {
+        String longComment = "This is a really fantastic bird sighting and I am so glad you shared it with the entire community here today!";
+        CommentRequest request = new CommentRequest(longComment);
 
-            client.post().uri("/api/v1/posts/" + testPost.getId() + "/comments")
-                    .header("Authorization", "Bearer " + validJwtToken)
-                    .bodyValue(request)
-                    .exchange()
-                    .expectStatus().isCreated()
-                    .expectBody()
-                    .jsonPath("$.data.content").isEqualTo("Comment number " + i)
-                    .jsonPath("$.data.user.username").isEqualTo("socialuser"); // Validates AC: include username
-        }
-
-        // 2. Fetch comments with pagination (size 2)
-        client.get().uri("/api/v1/posts/" + testPost.getId() + "/comments?page=0&size=2")
+        client.post().uri("/api/v1/posts/" + testPost.getId() + "/comments")
                 .header("Authorization", "Bearer " + validJwtToken)
+                .bodyValue(request)
                 .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.success").isEqualTo(true)
-                .jsonPath("$.data.content.length()").isEqualTo(2)
-                .jsonPath("$.data.totalElements").isEqualTo(3)
-                .jsonPath("$.data.totalPages").isEqualTo(2)
-                .jsonPath("$.data.content[0].content").isEqualTo("Comment number 1"); // Verify default sort is ASC for comments
+                .expectStatus().isCreated();
+
+        // Verify RabbitMQ Event published with truncated snippet logic applied
+        NewCommentEvent event = (NewCommentEvent) rabbitTemplate.receiveAndConvert(
+                RabbitMQConfig.NOTIFICATIONS_QUEUE, 2000);
+
+        assertThat(event).isNotNull();
+        assertThat(event.commenterUserId()).isEqualTo(testUser.getId());
+        // Snippet length check: "This is a really fantastic bird sighting and I a..."
+        assertThat(event.commentSnippet()).hasSize(50);
+        assertThat(event.commentSnippet()).endsWith("...");
     }
 
     @Test

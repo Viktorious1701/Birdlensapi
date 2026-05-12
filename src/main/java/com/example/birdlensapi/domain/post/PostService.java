@@ -13,7 +13,9 @@ import com.example.birdlensapi.domain.taxonomy.BirdTaxonomy;
 import com.example.birdlensapi.domain.taxonomy.TaxonomyRepository;
 import com.example.birdlensapi.domain.user.User;
 import com.example.birdlensapi.domain.user.UserRepository;
+import com.example.birdlensapi.messaging.events.NewCommentEvent;
 import com.example.birdlensapi.messaging.events.PostCreatedEvent;
+import com.example.birdlensapi.messaging.events.PostLikedEvent;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
@@ -139,6 +141,12 @@ public class PostService {
             reaction.setUser(user);
             reaction.setReactionType(ReactionType.LIKE);
             postReactionRepository.save(reaction);
+
+            // Avoid sending notifications if the user is liking their own post
+            if (!user.getId().equals(post.getUser().getId())) {
+                PostLikedEvent event = new PostLikedEvent(post.getId(), user.getId(), post.getUser().getId());
+                rabbitTemplate.convertAndSend(RabbitMQConfig.NOTIFICATIONS_EXCHANGE, RabbitMQConfig.NOTIFICATION_POST_LIKED_ROUTING_KEY, event);
+            }
         }
     }
 
@@ -156,6 +164,16 @@ public class PostService {
         comment.setContent(request.content());
 
         PostComment savedComment = postCommentRepository.save(comment);
+
+        // Generate a snippet: if comment is longer than 50 chars, truncate it for the notification text
+        String snippet = request.content().length() > 50 ?
+                request.content().substring(0, 47) + "..." : request.content();
+
+        // Avoid sending notifications if the user is commenting on their own post
+        if (!user.getId().equals(post.getUser().getId())) {
+            NewCommentEvent event = new NewCommentEvent(post.getId(), user.getId(), post.getUser().getId(), snippet);
+            rabbitTemplate.convertAndSend(RabbitMQConfig.NOTIFICATIONS_EXCHANGE, RabbitMQConfig.NOTIFICATION_POST_COMMENTED_ROUTING_KEY, event);
+        }
 
         return CommentResponse.fromEntity(savedComment);
     }

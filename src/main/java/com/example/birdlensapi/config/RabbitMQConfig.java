@@ -23,7 +23,11 @@ public class RabbitMQConfig {
     // Notifications Topology
     public static final String NOTIFICATIONS_EXCHANGE = "notifications.exchange";
     public static final String NOTIFICATIONS_QUEUE = "notifications-queue";
+
+    // Explicit Routing Keys for the Topic Exchange
     public static final String NOTIFICATION_SUBSCRIPTION_ACTIVATED_ROUTING_KEY = "notification.subscription.activated";
+    public static final String NOTIFICATION_POST_LIKED_ROUTING_KEY = "notification.post.liked";
+    public static final String NOTIFICATION_POST_COMMENTED_ROUTING_KEY = "notification.post.commented";
 
     // Dead-Letter Exchange (DLX) setup
     public static final String DLX_EXCHANGE = "dlx.exchange";
@@ -77,9 +81,10 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(imageProcessingQueue()).to(postsExchange()).with(POST_CREATED_ROUTING_KEY);
     }
 
+    // Bind any key starting with "notification." to the notifications queue
     @Bean
     public Binding bindingNotificationsQueue() {
-        return BindingBuilder.bind(notificationsQueue()).to(notificationsExchange()).with("notification.*.*");
+        return BindingBuilder.bind(notificationsQueue()).to(notificationsExchange()).with("notification.#");
     }
 
     @Bean
